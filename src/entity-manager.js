@@ -14,7 +14,7 @@ export class EntityManager {
   /**
    * Construct a new EntityManager.
    *
-   * @param {Container} container aurelia-dependency-injection container
+   * @param {Container} container
    */
   constructor(container) {
     this.container = container;
@@ -23,9 +23,9 @@ export class EntityManager {
   /**
    * Register an array of entity classes.
    *
-   * @param {function[]|function} Entity classes array or object of Entity constructors.
+   * @param {function[]|function} EntityClasses Array or object of Entity constructors.
    *
-   * @return {EntityManager} this
+   * @return {EntityManager} itself
    * @chainable
    */
   registerEntities(EntityClasses) {
@@ -43,19 +43,13 @@ export class EntityManager {
    *
    * @param {function} EntityClass
    *
-   * @return {EntityManager} this
+   * @return {EntityManager} itself
    * @chainable
    */
   registerEntity(EntityClass) {
-    if (!Entity.isPrototypeOf(EntityClass)) {
-      throw new Error(`
-        Trying to register non-Entity with aurelia-orm.
-        Are you using 'import *' to load your entities?
-        <http://aurelia-orm.spoonx.org/configuration.html>
-      `);
-    }
+    let meta = OrmMetadata.forTarget(EntityClass);
 
-    this.entities[OrmMetadata.forTarget(EntityClass).fetch('resource')] = EntityClass;
+    this.entities[meta.fetch('identifier') || meta.fetch('resource')] = EntityClass;
 
     return this;
   }
@@ -69,11 +63,16 @@ export class EntityManager {
    * @throws {Error}
    */
   getRepository(entity) {
-    let reference = this.resolveEntityReference(entity);
-    let resource  = entity;
+    let reference  = this.resolveEntityReference(entity);
+    let identifier = entity;
+    let resource   = entity;
 
     if (typeof reference.getResource === 'function') {
       resource = reference.getResource() || resource;
+    }
+
+    if (typeof reference.getIdentifier === 'function') {
+      identifier = reference.getIdentifier() || resource;
     }
 
     if (typeof resource !== 'string') {
@@ -81,8 +80,8 @@ export class EntityManager {
     }
 
     // Cached instance available. Return.
-    if (this.repositories[resource]) {
-      return this.repositories[resource];
+    if (this.repositories[identifier]) {
+      return this.repositories[identifier];
     }
 
     // Get instance of repository
@@ -98,11 +97,12 @@ export class EntityManager {
     // Tell the repository instance what resource it should use.
     instance.setMeta(metaData);
     instance.resource      = resource;
+    instance.identifier    = identifier;
     instance.entityManager = this;
 
     if (instance instanceof DefaultRepository) {
       // This is a default repository. We'll cache this instance.
-      this.repositories[resource] = instance;
+      this.repositories[identifier] = instance;
     }
 
     return instance;
@@ -141,6 +141,7 @@ export class EntityManager {
     let reference = this.resolveEntityReference(entity);
     let instance  = this.container.get(reference);
     let resource  = reference.getResource();
+    let identifier = reference.getIdentifier() || resource;
 
     if (!resource) {
       if (typeof entity !== 'string') {
@@ -148,6 +149,7 @@ export class EntityManager {
       }
 
       resource = entity;
+      identifier = entity;
     }
 
     // Set the validator.
@@ -157,6 +159,8 @@ export class EntityManager {
       instance.setValidator(validator);
     }
 
-    return instance.setResource(resource).setRepository(this.getRepository(resource));
+    return instance.setResource(resource)
+      .setIdentifier(identifier)
+      .setRepository(this.getRepository(identifier));
   }
 }

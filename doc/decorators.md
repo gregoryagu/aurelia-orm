@@ -14,18 +14,18 @@ import {CustomRepository} from 'repository/custom-repository';
 @resource('my-endpoint')
 @repository(CustomRepository)
 @validation()
-export class MyEntity extends Entity {
+export class Order extends Entity {
   @ensure(it => it.isNotEmpty().hasLengthBetween(3, 20))
   @type('string')
   name = null;
 
-  // Will use string 'onetoone' as resource name.
+  // Will use string 'contact' as resource name. One-to-one.
   @association()
-  oneToOne = null
+  contact = null
 
-  // Will use 'multiple' as resource name.
-  @association('multiple')
-  oneManyToMany = null
+  // Will use 'lineItem' as resource name. One-to-Many
+  @association('lineItem')
+  lineItems = null
 }
 ```
 
@@ -43,11 +43,25 @@ class HelloWorld {}
 class HelloWorld {}
 ```
 
+## @identifier()
+
+This decorator comes in handy when you have the same resource name for multiple endpoints. Without it, aurelia-orm will use the resource decorator. The identifier will be used to register and retrieve the repository for the given entity.
+
+When left empty, the name of the class (.toLowerCase()) will be used as the resource name. This is usually fine. 
+
+> **NOTE:** Leaving the decorator without a value is bad idea for bundling, because the bundler renames your modules it will not longer match. For more information see [bundling](https://github.com/SpoonX/aurelia-orm#bundling)
+
+```js
+// Sets the identifier to "i-want-bacon"
+@identifier('i-want-bacon')
+class HelloWorld {}
+```
+
 ## @resource()
 
 This decorator is probably the most important one. Without it, aurelia-orm won't know what your **custom entity** is all about. The resource maps to the API endpoint it represents. Simply put, resource `foo` maps to `/foo`.
 
-When left empty, the name of the class (.toLowerCase()) will be used as the resource name. This is usually fine.
+When left empty, the name of the class (.toLowerCase()) will be used as the resource name. This is usually fine but **not recommended** if you uglify/minify your sources later, because of the shortended class name.
 
 ```js
 // Defaults to resource "helloworld"

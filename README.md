@@ -30,7 +30,7 @@ We've simplified installation and usage! This plugin should now be installed usi
 
 You can find usage examples and the documentation at [aurelia-orm-doc](http://aurelia-orm.spoonx.org/).
 
-The [changelog](doc/changelog.md) provides you with information about important changes.
+The [changelog](doc/CHANGELOG.md) provides you with information about important changes.
 
 ## Uses
 
@@ -45,7 +45,9 @@ The [changelog](doc/changelog.md) provides you with information about important 
 
 Aurelia-orm needs an installation of [aurelia-api](https://www.npmjs.com/package/aurelia-api) and `aurelia-validation@^0.12.3`.
 
-### Aureli-Cli
+### Aurelia-Cli
+
+Start by following the instructions for the dependencies of orm, [aurelia-api](https://github.com/SpoonX/aurelia-api) and [aurelia-view-manager](https://github.com/SpoonX/aurelia-view-manager). When done, resume with the other steps.
 
 Run `npm i aurelia-orm --save` from your project root.
 
@@ -60,8 +62,8 @@ It also has submodules and makes use of `get-prop`. So, add following to the `bu
     "path": "../node_modules/aurelia-orm/dist/amd",
     "main": "aurelia-orm",
     "resources": [
-      "component/association-select.html",
-      "component/paged.html"
+      "component/view/bootstrap/association-select.html",
+      "component/view/bootstrap/paged.html"
     ]
   },
   {
@@ -148,10 +150,9 @@ export class Create {
     this.requestInFlight = true;
 
     this.entity.validate()
-      .then(validationErrors => {
-        if (validationErrors.length !== 0) {
-          console.error(error);
-          throw validationErrors[0];
+      .then(validateResults => {
+        if (!validateResults[0].valid) {
+          throw validateResults[0];
         }
 
         return this.entity.save();
@@ -180,3 +181,8 @@ For instance, `@resource()` would use the module's name to set the resource.
 
 So keep in mind: When using aurelia-orm in a bundled application, you must specify a value for your decorators.
 For instance, `@decorator('category')`.
+
+
+## Known hacks
+
+- The association-select always parses the `placeholderText` as html (`t="[html]${placeholderText}"`) due a [aurelia-i18n binding issue](https://github.com/aurelia/i18n/issues/147).

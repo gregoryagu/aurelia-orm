@@ -10,7 +10,7 @@ import {WithAssociations} from './resources/entity/with-associations';
 import {WithName} from './resources/entity/with-name';
 import {Entity} from '../src/entity';
 import {Config, Rest} from 'aurelia-api';
-import {StandardValidator, ValidationRules, ValidationError} from 'aurelia-validation';
+import {StandardValidator, ValidationRules, ValidateResult} from 'aurelia-validation';
 import {bootstrap} from 'aurelia-bootstrapper';
 
 describe('Entity', function() {
@@ -189,7 +189,7 @@ describe('Entity', function() {
       entity.idTag  = 1337;
 
       entity.save().then(response => {
-        expect(response.body).toEqual({foo: 'bar'});
+        expect(response.body).toEqual({idTag: 1337, foo: 'bar'});
         expect(response.path).toEqual('/with-resource/1337');
         expect(response.method).toEqual('PUT');
 
@@ -251,7 +251,7 @@ describe('Entity', function() {
       entity.id    = 1991;
 
       entity.save().then(response => {
-        expect(response.body).toEqual({bacon: 'great!'});
+        expect(response.body).toEqual({id: 1991, bacon: 'great!'});
         expect(response.path).toEqual('/default-entity/1991');
         expect(response.method).toEqual('PUT');
 
@@ -329,6 +329,28 @@ describe('Entity', function() {
       expect(entity.isNew()).toBe(true);
       entity.setData({idTag: false});
       expect(entity.isNew()).toBe(true);
+    });
+  });
+
+  describe('.clear()', function() {
+    it('Should set the entity\'s properties to its original values', function() {
+      let entity = constructEntity(WithName);
+
+      entity.setData({
+              id: 667,
+              name: "original"
+            }).markClean();
+
+            
+      entity.setData({name: "dirty"});      
+      expect(entity.isNew()).toBe(false);
+      expect(entity.clear().name).toBe("original");
+      
+      let newEntity = constructEntity(WithName);
+
+      expect(newEntity.isNew()).toBe(true);
+      newEntity.name = "not really dirty since I'm new";
+      expect(newEntity.name).toBe("not really dirty since I'm new");
     });
   });
 
@@ -416,7 +438,7 @@ describe('Entity', function() {
       entity.city = {awesome: true};
 
       entity.update().then(response => {
-        expect(response.body).toEqual({foo: 'bar', city: {awesome: true}});
+        expect(response.body).toEqual({idTag: 666, foo: 'bar', city: {awesome: true}});
         expect(response.path).toEqual('/with-resource/666');
         expect(response.method).toEqual('PUT');
 
@@ -474,6 +496,7 @@ describe('Entity', function() {
         expect(response.path).toEqual('/withassociations/1');
         expect(response.method).toEqual('PUT');
         expect(response.body).toEqual({
+          id: 1,
           bar: {
             baby: 'steps'
           },
@@ -679,15 +702,15 @@ describe('Entity', function() {
     it('Should return true if validation meta is not true.', function(done) {
       let entity = constructEntity(WithResource);
 
-      entity.validate().then(res=>expect(res.length).toBe(0)).then(done);
+      entity.validate().then(res => expect(res.length).toBe(0)).then(done);
     });
 
     it('Should use validator with object rules', function(done) {
       let entity = constructEntity(WithValidation);
 
       entity.validate().then(res => {
-        expect(res.length).not.toBe(0);
-        expect(res[0] instanceof ValidationError).toBe(true);
+        expect(res[0].valid).toBe(false);
+        expect(res[0] instanceof ValidateResult).toBe(true);
         expect(res[0].message).toBe('Foo is required.');
       }).then(done);
     });
@@ -704,8 +727,9 @@ describe('Entity', function() {
       let entity = constructEntity(WithValidation);
 
       entity.validate('bar', ValidationRules.ensure('bar').required().rules).then(res => {
-        expect(res.length).not.toBe(0);
-        expect(res[0] instanceof ValidationError).toBe(true);
+        expect(res.length).toBe(1);
+        expect(res[0].valid).toBe(false);
+        expect(res[0] instanceof ValidateResult).toBe(true);
         expect(res[0].message).toBe('Bar is required.');
       }).then(done);
     });
@@ -714,8 +738,9 @@ describe('Entity', function() {
       let entity = constructEntity(WithAssociationValidation);
 
       entity.validate().then(res => {
-        expect(res.length).not.toBe(0);
-        expect(res[0] instanceof ValidationError).toBe(true);
+        expect(res.length).toBe(1);
+        expect(res[0].valid).toBe(false);
+        expect(res[0] instanceof ValidateResult).toBe(true);
         expect(res[0].message).toBe('Foo must be an association.');
       }).then(done);
     });
@@ -725,7 +750,7 @@ describe('Entity', function() {
       entity.foo = 1;
 
       entity.validate().then(res => {
-        expect(res.length).toBe(0);
+        expect(res[0].valid).toBe(true);
       }).then(done);
     });
   });
@@ -837,6 +862,32 @@ describe('Entity', function() {
 
       expect(parentEntity.asObject()).toEqual({
         foo: null,
+        bar: {
+          baby: 'steps'
+        },
+        test: 'case'
+      });
+    });
+
+    it('Should return a POJO and include emoty arrays on associations.', function() {
+      let parentEntity = new WithAssociations();
+      let fooEntityOne = new Foo();
+      let fooEntityTwo = new Foo();
+      let customEntity = new Custom();
+
+      fooEntityOne.some  = 'value';
+      fooEntityOne.other = 'other value';
+      fooEntityTwo.what  = 'Jup';
+      customEntity.baby  = 'steps';
+
+      parentEntity.setData({
+        test: 'case',
+        foo: [],
+        bar: customEntity
+      });
+
+      expect(parentEntity.asObject()).toEqual({
+        foo: [],
         bar: {
           baby: 'steps'
         },

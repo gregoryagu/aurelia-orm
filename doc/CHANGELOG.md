@@ -1,3 +1,271 @@
+<a name="7.0.1"></a>
+## [7.0.1](https://github.com/SpoonX/aurelia-orm/compare/v7.0.0...v7.0.1) (2018-10-30)
+
+
+### Bug Fixes
+
+* Fix identifier on association-select ([7ad048d](https://github.com/SpoonX/aurelia-orm/commit/7ad048d))
+
+
+
+<a name="7.0.0"></a>
+# [7.0.0](https://github.com/SpoonX/aurelia-orm/compare/v6.2.0...v7.0.0) (2018-10-17)
+
+
+### Bug Fixes
+
+* **project:** update github token for travis ([81b712f](https://github.com/SpoonX/aurelia-orm/commit/81b712f))
+* **Repository:** default empty dates to null ([0086a0a](https://github.com/SpoonX/aurelia-orm/commit/0086a0a))
+* **Repository:** define variable dataType ([6c97663](https://github.com/SpoonX/aurelia-orm/commit/6c97663))
+* **Repository:** properly call casting method ([255d66c](https://github.com/SpoonX/aurelia-orm/commit/255d66c))
+
+
+### BREAKING CHANGES
+
+* **Repository:** this change makes it so that the date value will no longer be a Date instance based on null, but instead will just be null.
+
+
+
+<a name="6.2.0"></a>
+# [6.2.0](https://github.com/SpoonX/aurelia-orm/compare/v6.1.2...v6.2.0) (2017-07-10)
+
+
+### Features
+
+* **paged:** add loading flag ([be04557](https://github.com/SpoonX/aurelia-orm/commit/be04557))
+* **paged:** add loading flag ([6886e6b](https://github.com/SpoonX/aurelia-orm/commit/6886e6b))
+
+
+
+<a name="6.1.2"></a>
+## [6.1.2](https://github.com/SpoonX/aurelia-orm/compare/v6.1.1...v6.1.2) (2017-06-07)
+
+
+### Bug Fixes
+
+* **repository:** use identifier property if defined ([197d18e](https://github.com/SpoonX/aurelia-orm/commit/197d18e)), closes [#294](https://github.com/SpoonX/aurelia-orm/issues/294)
+
+
+
+<a name="6.1.1"></a>
+## [6.1.1](https://github.com/SpoonX/aurelia-orm/compare/v6.1.0...v6.1.1) (2017-05-23)
+
+
+### Bug Fixes
+
+* **entity-manager:** return the correct cached instance based on the identifier property ([3aaf18e](https://github.com/SpoonX/aurelia-orm/commit/3aaf18e))
+
+
+
+<a name="6.1.0"></a>
+# [6.1.0](https://github.com/SpoonX/aurelia-orm/compare/v6.0.2...v6.1.0) (2017-05-22)
+
+
+### Features
+
+* **project:** add identifier decorator to support the duplicated resources ([286453f](https://github.com/SpoonX/aurelia-orm/commit/286453f))
+
+
+
+<a name="6.0.2"></a>
+## [6.0.2](https://github.com/SpoonX/aurelia-orm/compare/v6.0.1...v6.0.2) (2017-04-21)
+
+
+### Bug Fixes
+
+* **associationSelect:** fix value binding ([0d38982](https://github.com/SpoonX/aurelia-orm/commit/0d38982))
+
+
+
+<a name="6.0.1"></a>
+## [6.0.1](https://github.com/SpoonX/aurelia-orm/compare/v6.0.0...v6.0.1) (2017-04-16)
+
+
+
+<a name="5.0.0"></a>
+# [5.0.0](https://github.com/SpoonX/aurelia-orm/compare/v5.0.0-2...v5.0.0) (2017-03-03)
+
+
+### Features
+
+* **entity:** add clear method which resets dirty properties ([09beaef](https://github.com/SpoonX/aurelia-orm/commit/09beaef))
+
+
+
+<a name="5.0.0-2"></a>
+# [5.0.0-2](https://github.com/SpoonX/aurelia-orm/compare/v5.0.0-1...v5.0.0-2) (2017-02-23)
+
+
+### Bug Fixes
+
+* **association-select:** add name attribute ([19b40fd](https://github.com/SpoonX/aurelia-orm/commit/19b40fd))
+
+
+
+<a name="5.0.0-1"></a>
+# [5.0.0-1](https://github.com/SpoonX/aurelia-orm/compare/v5.0.0-0...v5.0.0-1) (2017-02-15)
+
+
+### Bug Fixes
+
+* **entity:** do not delete id from request body in update calls ([cfd6cf6](https://github.com/SpoonX/aurelia-orm/commit/cfd6cf6))
+* **paged:** inject the EntityManager ([e77e733](https://github.com/SpoonX/aurelia-orm/commit/e77e733))
+
+
+### BREAKING CHANGES
+
+* entity: id properties are now included in the request body of update calls. Fixes #185.
+
+
+
+<a name="5.0.0-0"></a>
+# [5.0.0-0](https://github.com/SpoonX/aurelia-orm/compare/v4.1.1...v5.0.0-0) (2017-02-07)
+
+
+### Bug Fixes
+
+* **entity:** do not skip empty arrays ([fad77ec](https://github.com/SpoonX/aurelia-orm/commit/fad77ec))
+
+
+### BREAKING CHANGES
+
+* entity: toObject and toJSON will now return empty arrays instead of skipping completely
+
+
+
+<a name="4.1.1"></a>
+## [4.1.1](https://github.com/SpoonX/aurelia-orm/compare/v4.1.0...v4.1.1) (2017-02-01)
+
+
+
+<a name="4.1.0"></a>
+# [4.1.0](https://github.com/SpoonX/aurelia-orm/compare/v4.0.0...v4.1.0) (2017-02-01)
+
+
+### Bug Fixes
+
+* **association-select:** use property on entity instead of resource ([9c58665](https://github.com/SpoonX/aurelia-orm/commit/9c58665))
+* **repository:** use clean instead of hardcoded true ([802c23f](https://github.com/SpoonX/aurelia-orm/commit/802c23f))
+
+
+### Features
+
+* **project:** expose metadata class ([a7e0746](https://github.com/SpoonX/aurelia-orm/commit/a7e0746))
+* **repository:** allow populating clean entities ([3fe5acb](https://github.com/SpoonX/aurelia-orm/commit/3fe5acb))
+
+
+
+<a name="4.0.0"></a>
+# [4.0.0](https://github.com/SpoonX/aurelia-orm/compare/v3.3.0...v4.0.0) (2017-01-31)
+
+
+### Bug Fixes
+
+* **association-select:** use model.bind instead of value.bind ([855c24a](https://github.com/SpoonX/aurelia-orm/commit/855c24a))
+
+
+### BREAKING CHANGES
+
+* association-select: Can break module for users that expect a string when given `undefined`, `null` or `[]`.
+
+
+
+<a name="3.3.0"></a>
+# [3.3.0](https://github.com/SpoonX/aurelia-orm/compare/v3.2.2...v3.3.0) (2017-01-17)
+
+
+### Features
+
+* **associationSelect:** add disabled as bindable ([44d9efa](https://github.com/SpoonX/aurelia-orm/commit/44d9efa))
+
+
+
+<a name="3.2.2"></a>
+## [3.2.2](https://github.com/SpoonX/aurelia-orm/compare/v3.2.1...v3.2.2) (2017-01-11)
+
+
+### Bug Fixes
+
+* **project:** import components ([55df81b](https://github.com/SpoonX/aurelia-orm/commit/55df81b))
+
+
+
+<a name="3.2.1"></a>
+## [3.2.1](https://github.com/SpoonX/aurelia-orm/compare/v3.2.0...v3.2.1) (2017-01-11)
+
+
+### Bug Fixes
+
+* **project:** do not import components twice during build ([b6c1000](https://github.com/SpoonX/aurelia-orm/commit/b6c1000))
+
+
+### Features
+
+* **project:** export components to enable patching ([5be13c7](https://github.com/SpoonX/aurelia-orm/commit/5be13c7))
+
+
+
+<a name="3.2.0"></a>
+# [3.2.0](https://github.com/SpoonX/aurelia-orm/compare/v3.1.0...v3.2.0) (2017-01-11)
+
+
+### Features
+
+* **enumeration:** define valid values for a field ([aa204fc](https://github.com/SpoonX/aurelia-orm/commit/aa204fc))
+
+
+
+<a name="3.1.0"></a>
+# [3.1.0](https://github.com/SpoonX/aurelia-orm/compare/v3.1.0-0...v3.1.0) (2017-01-09)
+
+
+### Features
+
+* **association:** make placeholder value configurable ([bc63a23](https://github.com/SpoonX/aurelia-orm/commit/bc63a23))
+
+
+
+<a name="3.1.0-0"></a>
+# [3.1.0-0](https://github.com/SpoonX/aurelia-orm/compare/v3.0.1...v3.1.0-0) (2017-01-03)
+
+
+
+<a name="3.0.1"></a>
+## [3.0.1](https://github.com/SpoonX/aurelia-orm/compare/3.0.0...v3.0.1) (2016-11-01)
+
+
+### Bug Fixes
+
+* **component:** always parse association-select placeholder as html ([fcbee42](https://github.com/SpoonX/aurelia-orm/commit/fcbee42))
+
+
+
+<a name="3.0.0"></a>
+# [3.0.0](https://github.com/SpoonX/aurelia-orm/compare/3.0.0-rc7...v3.0.0) (2016-10-05)
+
+
+### Bug Fixes
+
+* **association-select:** use resource instead of property, check for all falsy values in isNew instead only undefined ([8063c11](https://github.com/SpoonX/aurelia-orm/commit/8063c11))
+* **bundle:** re-add imports for bundling ([07b4544](https://github.com/SpoonX/aurelia-orm/commit/07b4544))
+* **entitiy.manager:** throw when trying to register non-entity ([46c6bdb](https://github.com/SpoonX/aurelia-orm/commit/46c6bdb))
+* **entity-manager:** revert entity prototype test. gives false positives in ts ([b44de7f](https://github.com/SpoonX/aurelia-orm/commit/b44de7f))
+* **repository:** findPath now returns null when the server doesn't return data ([63044a0](https://github.com/SpoonX/aurelia-orm/commit/63044a0))
+
+
+### Features
+
+* **property-decorators:** make properties configurable if needed ([aa6e94e](https://github.com/SpoonX/aurelia-orm/commit/aa6e94e))
+* **validation:** move to aurelia-validation 0.12+ ([e211ffb](https://github.com/SpoonX/aurelia-orm/commit/e211ffb))
+* **validation:** optionally set Validator class ([76328ac](https://github.com/SpoonX/aurelia-orm/commit/76328ac))
+
+
+### BREAKING CHANGES
+
+* validation: Update to aurelia-validation@^0.12.3 See the changed documenation on validation of usage
+
+
+
 <a name="3.0.0-rc7"></a>
 ## [3.0.0-rc7](https://github.com/SpoonX/aurelia-orm/compare/3.0.0-rc6...v3.0.0-rc7) (2016-08-03)
 

@@ -1,6 +1,6 @@
 {
-  "extends": "./node_modules/aurelia-tools/.eslintrc.json",
+  "extends": "./node_modules/spoonx-tools/.eslintrc.json",
   "rules": {
-    "no-new-func": 0
+    "max-lines": ["error", 400]
   }
 }

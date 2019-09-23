@@ -1,21 +1,24 @@
-define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aurelia-metadata', 'aurelia-validation', 'aurelia-logging'], function (exports, _typer, _aureliaDependencyInjection, _aureliaApi, _aureliaMetadata, _aureliaValidation, _aureliaLogging) {
+define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aurelia-metadata', 'aurelia-validation', 'aurelia-logging', 'aurelia-view-manager'], function (exports, _typer, _aureliaDependencyInjection, _aureliaApi, _aureliaMetadata, _aureliaValidation, _aureliaLogging, _aureliaViewManager) {
   'use strict';
 
   Object.defineProperty(exports, "__esModule", {
     value: true
   });
-  exports.logger = exports.HasAssociationValidationRule = exports.EntityManager = exports.Entity = exports.Metadata = exports.OrmMetadata = exports.DefaultRepository = exports.Repository = undefined;
-  exports.association = association;
+  exports.logger = exports.EntityManager = exports.Entity = exports.Metadata = exports.OrmMetadata = exports.DefaultRepository = exports.Repository = undefined;
   exports.idProperty = idProperty;
+  exports.identifier = identifier;
   exports.name = name;
   exports.repository = repository;
   exports.resource = resource;
-  exports.type = type;
   exports.validation = validation;
   exports.validatedResource = validatedResource;
   exports.configure = configure;
   exports.data = data;
   exports.endpoint = endpoint;
+  exports.ensurePropertyIsConfigurable = ensurePropertyIsConfigurable;
+  exports.association = association;
+  exports.enumeration = enumeration;
+  exports.type = type;
 
   var _typer2 = _interopRequireDefault(_typer);
 
@@ -52,12 +55,12 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
   var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) {
     return typeof obj;
   } : function (obj) {
-    return obj && typeof Symbol === "function" && obj.constructor === Symbol ? "symbol" : typeof obj;
+    return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj;
   };
 
   
 
-  var _dec, _class, _dec2, _class3, _class4, _temp, _dec3, _dec4, _class5, _dec5, _class6;
+  var _dec, _class, _dec2, _class3, _class4, _temp, _dec3, _class5, _dec4, _class6;
 
   var Repository = exports.Repository = (_dec = (0, _aureliaDependencyInjection.inject)(_aureliaApi.Config), _dec(_class = function () {
     function Repository(clientConfig) {
@@ -88,6 +91,16 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       return this.meta;
     };
 
+    Repository.prototype.setIdentifier = function setIdentifier(identifier) {
+      this.identifier = identifier;
+
+      return this;
+    };
+
+    Repository.prototype.getIdentifier = function getIdentifier() {
+      return this.identifier;
+    };
+
     Repository.prototype.setResource = function setResource(resource) {
       this.resource = resource;
 
@@ -102,18 +115,37 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       return this.findPath(this.resource, criteria, raw);
     };
 
-    Repository.prototype.findPath = function findPath(path, criteria, raw) {
+    Repository.prototype.findOne = function findOne(criteria, raw) {
+      return this.findPath(this.resource, criteria, raw, true);
+    };
+
+    Repository.prototype.findPath = function findPath(path, criteria, raw, single) {
       var _this = this;
 
-      var findQuery = this.getTransport().find(path, criteria);
+      var transport = this.getTransport();
+      var findQuery = void 0;
+
+      if (single) {
+        if ((typeof criteria === 'undefined' ? 'undefined' : _typeof(criteria)) === 'object' && criteria !== null) {
+          criteria.limit = 1;
+        }
+
+        findQuery = transport.findOne(path, criteria);
+      } else {
+        findQuery = transport.find(path, criteria);
+      }
 
       if (raw) {
         return findQuery;
       }
 
-      return findQuery.then(function (x) {
-        return _this.populateEntities(x);
+      return findQuery.then(function (response) {
+        return _this.populateEntities(response);
       }).then(function (populated) {
+        if (!populated) {
+          return null;
+        }
+
         if (!Array.isArray(populated)) {
           return populated.markClean();
         }
@@ -130,7 +162,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       return this.getTransport().find(this.resource + '/count', criteria);
     };
 
-    Repository.prototype.populateEntities = function populateEntities(data) {
+    Repository.prototype.populateEntities = function populateEntities(data, clean) {
       var _this2 = this;
 
       if (!data) {
@@ -138,19 +170,19 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       }
 
       if (!Array.isArray(data)) {
-        return this.getPopulatedEntity(data);
+        return this.getPopulatedEntity(data, null, clean);
       }
 
       var collection = [];
 
       data.forEach(function (source) {
-        collection.push(_this2.getPopulatedEntity(source));
+        collection.push(_this2.getPopulatedEntity(source, null, clean));
       });
 
       return collection;
     };
 
-    Repository.prototype.getPopulatedEntity = function getPopulatedEntity(data, entity) {
+    Repository.prototype.getPopulatedEntity = function getPopulatedEntity(data, entity, clean) {
       entity = entity || this.getNewEntity();
       var entityMetadata = entity.getMeta();
       var populatedData = {};
@@ -164,7 +196,13 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
         var value = data[key];
 
         if (entityMetadata.has('types', key)) {
-          populatedData[key] = _typer2.default.cast(value, entityMetadata.fetch('types', key));
+          var dataType = entityMetadata.fetch('types', key);
+
+          if ((dataType === 'date' || dataType === 'datetime') && !value) {
+            continue;
+          }
+
+          populatedData[key] = _typer2.default.cast(value, dataType);
 
           continue;
         }
@@ -176,14 +214,15 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
         }
 
         var _repository = this.entityManager.getRepository(entityMetadata.fetch('associations', key).entity);
-        populatedData[key] = _repository.populateEntities(value);
+
+        populatedData[key] = _repository.populateEntities(value, clean);
       }
 
-      return entity.setData(populatedData);
+      return entity.setData(populatedData, clean);
     };
 
     Repository.prototype.getNewEntity = function getNewEntity() {
-      return this.entityManager.getEntity(this.resource);
+      return this.entityManager.getEntity(this.identifier || this.resource);
     };
 
     Repository.prototype.getNewPopulatedEntity = function getNewPopulatedEntity() {
@@ -191,13 +230,15 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       var associations = entity.getMeta().fetch('associations');
 
       for (var property in associations) {
-        var assocMeta = associations[property];
+        if (associations.hasOwnProperty(property)) {
+          var assocMeta = associations[property];
 
-        if (assocMeta.type !== 'entity') {
-          continue;
+          if (assocMeta.type !== 'entity') {
+            continue;
+          }
+
+          entity[property] = this.entityManager.getRepository(assocMeta.entity).getNewEntity();
         }
-
-        entity[property] = this.entityManager.getRepository(assocMeta.entity).getNewEntity();
       }
 
       return entity;
@@ -235,6 +276,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
 
       this.metadata = {
         repository: DefaultRepository,
+        identifier: null,
         resource: null,
         endpoint: null,
         name: null,
@@ -293,17 +335,11 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
 
     return Metadata;
   }(), _class4.key = 'spoonx:orm:metadata', _temp);
-  var Entity = exports.Entity = (_dec3 = (0, _aureliaDependencyInjection.transient)(), _dec4 = (0, _aureliaDependencyInjection.inject)(_aureliaValidation.Validation), _dec3(_class5 = _dec4(_class5 = function () {
-    function Entity(validator) {
+  var Entity = exports.Entity = (_dec3 = (0, _aureliaDependencyInjection.transient)(), _dec3(_class5 = function () {
+    function Entity() {
       
 
       this.define('__meta', OrmMetadata.forTarget(this.constructor)).define('__cleanValues', {}, true);
-
-      if (!this.hasValidation()) {
-        return this;
-      }
-
-      return this.define('__validator', validator);
     }
 
     Entity.prototype.getTransport = function getTransport() {
@@ -360,6 +396,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       }
 
       var response = void 0;
+
       return this.getTransport().create(this.getResource(), this.asObject(true)).then(function (created) {
         _this4.setId(created[_this4.getIdProperty()]);
         response = created;
@@ -390,10 +427,8 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       var requestBody = this.asObject(true);
       var response = void 0;
 
-      delete requestBody[this.getIdProperty()];
-
       return this.getTransport().update(this.getResource(), this.getId(), requestBody).then(function (updated) {
-        return response = updated;
+        response = updated;
       }).then(function () {
         return _this5.saveCollections();
       }).then(function () {
@@ -494,6 +529,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
 
     Entity.prototype.markClean = function markClean() {
       var cleanValues = getFlat(this);
+
       this.__cleanValues = {
         checksum: JSON.stringify(cleanValues),
         data: cleanValues
@@ -511,7 +547,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
     };
 
     Entity.prototype.isNew = function isNew() {
-      return typeof this.getId() === 'undefined';
+      return !this.getId();
     };
 
     Entity.prototype.reset = function reset(shallow) {
@@ -568,6 +604,26 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       return this.markClean();
     };
 
+    Entity.prototype.clear = function clear() {
+      if (!this.isNew()) {
+        return this.setData(this.__cleanValues.data.entity);
+      }
+
+      return this;
+    };
+
+    Entity.getIdentifier = function getIdentifier() {
+      return OrmMetadata.forTarget(this).fetch('identifier');
+    };
+
+    Entity.prototype.getIdentifier = function getIdentifier() {
+      return this.__identifier || this.getMeta().fetch('identifier');
+    };
+
+    Entity.prototype.setIdentifier = function setIdentifier(identifier) {
+      return this.define('__identifier', identifier);
+    };
+
     Entity.getResource = function getResource() {
       return OrmMetadata.forTarget(this).fetch('resource');
     };
@@ -618,32 +674,30 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       return this;
     };
 
-    Entity.prototype.enableValidation = function enableValidation() {
-      if (!this.hasValidation()) {
-        throw new Error('Entity not marked as validated. Did you forget the @validation() decorator?');
-      }
+    Entity.prototype.setValidator = function setValidator(validator) {
+      this.define('__validator', validator);
 
-      if (this.__validation) {
-        return this;
-      }
-
-      return this.define('__validation', this.__validator.on(this));
+      return this;
     };
 
-    Entity.prototype.getValidation = function getValidation() {
+    Entity.prototype.getValidator = function getValidator() {
       if (!this.hasValidation()) {
         return null;
       }
 
-      if (!this.__validation) {
-        this.enableValidation();
-      }
-
-      return this.__validation;
+      return this.__validator;
     };
 
     Entity.prototype.hasValidation = function hasValidation() {
       return !!this.getMeta().fetch('validation');
+    };
+
+    Entity.prototype.validate = function validate(propertyName, rules) {
+      if (!this.hasValidation()) {
+        return Promise.resolve([]);
+      }
+
+      return propertyName ? this.getValidator().validateProperty(this, propertyName, rules) : this.getValidator().validateObject(this, rules);
     };
 
     Entity.prototype.asObject = function asObject(shallow) {
@@ -655,7 +709,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
     };
 
     return Entity;
-  }()) || _class5) || _class5);
+  }()) || _class5);
 
   function _asObject(entity, shallow) {
     var pojo = {};
@@ -719,9 +773,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
         }
       });
 
-      if (asObjects.length > 0) {
-        pojo[propertyName] = asObjects;
-      }
+      pojo[propertyName] = asObjects;
     });
 
     return pojo;
@@ -804,24 +856,15 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
     })[0];
   }
 
-  function association(associationData) {
-    return function (target, propertyName) {
-      if (!associationData) {
-        associationData = { entity: propertyName };
-      } else if (typeof associationData === 'string') {
-        associationData = { entity: associationData };
-      }
-
-      OrmMetadata.forTarget(target.constructor).put('associations', propertyName, {
-        type: associationData.entity ? 'entity' : 'collection',
-        entity: associationData.entity || associationData.collection
-      });
-    };
-  }
-
   function idProperty(propertyName) {
     return function (target) {
       OrmMetadata.forTarget(target).put('idProperty', propertyName);
+    };
+  }
+
+  function identifier(identifierName) {
+    return function (target) {
+      OrmMetadata.forTarget(target).put('identifier', identifierName || target.name.toLowerCase());
     };
   }
 
@@ -843,19 +886,15 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
     };
   }
 
-  function type(typeValue) {
-    return function (target, propertyName) {
-      OrmMetadata.forTarget(target.constructor).put('types', propertyName, typeValue);
-    };
-  }
-
   function validation() {
+    var ValidatorClass = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : _aureliaValidation.Validator;
+
     return function (target) {
-      OrmMetadata.forTarget(target).put('validation', true);
+      OrmMetadata.forTarget(target).put('validation', ValidatorClass);
     };
   }
 
-  var EntityManager = exports.EntityManager = (_dec5 = (0, _aureliaDependencyInjection.inject)(_aureliaDependencyInjection.Container), _dec5(_class6 = function () {
+  var EntityManager = exports.EntityManager = (_dec4 = (0, _aureliaDependencyInjection.inject)(_aureliaDependencyInjection.Container), _dec4(_class6 = function () {
     function EntityManager(container) {
       
 
@@ -865,38 +904,43 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       this.container = container;
     }
 
-    EntityManager.prototype.registerEntities = function registerEntities(entities) {
-      for (var reference in entities) {
-        if (!entities.hasOwnProperty(reference)) {
-          continue;
+    EntityManager.prototype.registerEntities = function registerEntities(EntityClasses) {
+      for (var property in EntityClasses) {
+        if (EntityClasses.hasOwnProperty(property)) {
+          this.registerEntity(EntityClasses[property]);
         }
-
-        this.registerEntity(entities[reference]);
       }
 
       return this;
     };
 
-    EntityManager.prototype.registerEntity = function registerEntity(entity) {
-      this.entities[OrmMetadata.forTarget(entity).fetch('resource')] = entity;
+    EntityManager.prototype.registerEntity = function registerEntity(EntityClass) {
+      var meta = OrmMetadata.forTarget(EntityClass);
+
+      this.entities[meta.fetch('identifier') || meta.fetch('resource')] = EntityClass;
 
       return this;
     };
 
     EntityManager.prototype.getRepository = function getRepository(entity) {
       var reference = this.resolveEntityReference(entity);
+      var identifier = entity;
       var resource = entity;
 
       if (typeof reference.getResource === 'function') {
         resource = reference.getResource() || resource;
       }
 
+      if (typeof reference.getIdentifier === 'function') {
+        identifier = reference.getIdentifier() || resource;
+      }
+
       if (typeof resource !== 'string') {
         throw new Error('Unable to find resource for entity.');
       }
 
-      if (this.repositories[resource]) {
-        return this.repositories[resource];
+      if (this.repositories[identifier]) {
+        return this.repositories[identifier];
       }
 
       var metaData = OrmMetadata.forTarget(reference);
@@ -909,10 +953,11 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
 
       instance.setMeta(metaData);
       instance.resource = resource;
+      instance.identifier = identifier;
       instance.entityManager = this;
 
       if (instance instanceof DefaultRepository) {
-        this.repositories[resource] = instance;
+        this.repositories[identifier] = instance;
       }
 
       return instance;
@@ -936,6 +981,7 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       var reference = this.resolveEntityReference(entity);
       var instance = this.container.get(reference);
       var resource = reference.getResource();
+      var identifier = reference.getIdentifier() || resource;
 
       if (!resource) {
         if (typeof entity !== 'string') {
@@ -943,46 +989,42 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
         }
 
         resource = entity;
+        identifier = entity;
       }
 
-      return instance.setResource(resource).setRepository(this.getRepository(resource));
+      if (instance.hasValidation() && !instance.getValidator()) {
+        var validator = this.container.get(OrmMetadata.forTarget(reference).fetch('validation'));
+
+        instance.setValidator(validator);
+      }
+
+      return instance.setResource(resource).setIdentifier(identifier).setRepository(this.getRepository(identifier));
     };
 
     return EntityManager;
   }()) || _class6);
-
-  var HasAssociationValidationRule = exports.HasAssociationValidationRule = function (_ValidationRule) {
-    _inherits(HasAssociationValidationRule, _ValidationRule);
-
-    function HasAssociationValidationRule() {
-      
-
-      return _possibleConstructorReturn(this, _ValidationRule.call(this, null, function (value) {
-        return !!(value instanceof Entity && typeof value.id === 'number' || typeof value === 'number');
-      }, null, 'isRequired'));
-    }
-
-    return HasAssociationValidationRule;
-  }(_aureliaValidation.ValidationRule);
-
-  function validatedResource(resourceName) {
+  function validatedResource(resourceName, ValidatorClass) {
     return function (target, propertyName) {
       resource(resourceName)(target);
-      validation()(target, propertyName);
+      validation(ValidatorClass)(target, propertyName);
     };
   }
 
-  function configure(aurelia, configCallback) {
-    var entityManagerInstance = aurelia.container.get(EntityManager);
+  function configure(frameworkConfig, configCallback) {
+    _aureliaValidation.ValidationRules.customRule('hasAssociation', function (value) {
+      return value instanceof Entity && typeof value.id === 'number' || typeof value === 'number';
+    }, '${$displayName} must be an association.');
+
+    var entityManagerInstance = frameworkConfig.container.get(EntityManager);
 
     configCallback(entityManagerInstance);
 
-    _aureliaValidation.ValidationGroup.prototype.hasAssociation = function () {
-      return this.isNotEmpty().passesRule(new HasAssociationValidationRule());
-    };
+    frameworkConfig.container.get(_aureliaViewManager.Config).configureNamespace('spoonx/orm', {
+      location: './view/{{framework}}/{{view}}.html'
+    });
 
-    aurelia.globalResources('./component/association-select');
-    aurelia.globalResources('./component/paged');
+    frameworkConfig.globalResources('./component/association-select');
+    frameworkConfig.globalResources('./component/paged');
   }
 
   var logger = exports.logger = (0, _aureliaLogging.getLogger)('aurelia-orm');
@@ -1004,6 +1046,49 @@ define(['exports', 'typer', 'aurelia-dependency-injection', 'aurelia-api', 'aure
       }
 
       OrmMetadata.forTarget(target).put('endpoint', entityEndpoint);
+    };
+  }
+
+  function ensurePropertyIsConfigurable(target, propertyName, descriptor) {
+    if (descriptor && descriptor.configurable === false) {
+      descriptor.configurable = true;
+
+      if (!Reflect.defineProperty(target, propertyName, descriptor)) {
+        logger.warn('Cannot make configurable property \'' + propertyName + '\' of object', target);
+      }
+    }
+  }
+
+  function association(associationData) {
+    return function (target, propertyName, descriptor) {
+      ensurePropertyIsConfigurable(target, propertyName, descriptor);
+
+      if (!associationData) {
+        associationData = { entity: propertyName };
+      } else if (typeof associationData === 'string') {
+        associationData = { entity: associationData };
+      }
+
+      OrmMetadata.forTarget(target.constructor).put('associations', propertyName, {
+        type: associationData.entity ? 'entity' : 'collection',
+        entity: associationData.entity || associationData.collection
+      });
+    };
+  }
+
+  function enumeration(values) {
+    return function (target, propertyName, descriptor) {
+      ensurePropertyIsConfigurable(target, propertyName, descriptor);
+
+      OrmMetadata.forTarget(target.constructor).put('enumerations', propertyName, values);
+    };
+  }
+
+  function type(typeValue) {
+    return function (target, propertyName, descriptor) {
+      ensurePropertyIsConfigurable(target, propertyName, descriptor);
+
+      OrmMetadata.forTarget(target.constructor).put('types', propertyName, typeValue);
     };
   }
 });

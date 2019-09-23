@@ -3,20 +3,35 @@ import {EntityManager} from './entity-manager';
 import {ValidationRules} from 'aurelia-validation';
 import {Entity} from './entity';
 
-export function configure(aurelia, configCallback) {
+import {AssociationSelect} from './component/association-select'; // eslint-disable-line no-unused-vars
+import {Paged} from './component/paged'; // eslint-disable-line no-unused-vars
+import {Config as ViewManagerConfig} from 'aurelia-view-manager';
+
+/**
+ * Plugin configure
+ *
+ * @export
+ * @param {*} frameworkConfig
+ * @param {*} configCallback
+ */
+export function configure(frameworkConfig, configCallback) {
   // add hasAssociation custom validation rule
   ValidationRules.customRule(
     'hasAssociation',
-    value => !!((value instanceof Entity && typeof value.id === 'number') || typeof value === 'number'),
+    value => (value instanceof Entity && typeof value.id === 'number') || typeof value === 'number',
     `\${$displayName} must be an association.`    // eslint-disable-line quotes
   );
 
-  let entityManagerInstance = aurelia.container.get(EntityManager);
+  let entityManagerInstance = frameworkConfig.container.get(EntityManager);
 
   configCallback(entityManagerInstance);
 
-  aurelia.globalResources('./component/association-select');
-  aurelia.globalResources('./component/paged');
+  frameworkConfig.container.get(ViewManagerConfig).configureNamespace('spoonx/orm', {
+     location: './view/{{framework}}/{{view}}.html'
+  });
+
+  frameworkConfig.globalResources('./component/association-select');
+  frameworkConfig.globalResources('./component/paged');
 }
 
 export const logger = getLogger('aurelia-orm');

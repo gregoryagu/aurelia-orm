@@ -2,29 +2,32 @@
 
 Aurelia-orm needs an installation of [aurelia-api](https://www.npmjs.com/package/aurelia-api) and `aurelia-validation@0.6.6`.
 
-## Aureli-Cli
+## Aurelia-Cli
+
+Start by following the instructions for the dependencies of orm, [aurelia-api](https://github.com/SpoonX/aurelia-api) and [aurelia-view-manager](https://github.com/SpoonX/aurelia-view-manager). When done, resume with the other steps.
 
 Run `npm i aurelia-orm --save` from your project root.
 
-It also has submodules and makes use of `get-prop`. So, add following to the `build.bundles.dependencies` section of `aurelia-project/aurelia.json`.
+It also has submodules and makes use of `get-prop` and `typer`. So, add following to the `build.bundles.dependencies` section of `aurelia-project/aurelia.json`.
 
 ```js
 "dependencies": [
   // ...
   "get-prop",
+  "typer",
   {
     "name": "aurelia-orm",
     "path": "../node_modules/aurelia-orm/dist/amd",
     "main": "aurelia-orm",
     "resources": [
-      "component/association-select.html",
-      "component/paged.html"
+      "component/view/bootstrap/association-select.html",
+      "component/view/bootstrap/paged.html"
     ]
   },
   {
     "name": "aurelia-validation",
     "path": "../node_modules/aurelia-validation/dist/amd",
-    "main": "index"
+    "main": "aurelia-validation"
   },
   // ...
 ],

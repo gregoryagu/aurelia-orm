@@ -1,11 +1,12 @@
-var _dec, _class, _dec2, _class3, _class4, _temp, _dec3, _dec4, _class5, _dec5, _class6;
+var _dec, _class, _dec2, _class3, _class4, _temp, _dec3, _class5, _dec4, _class6;
 
 import typer from 'typer';
 import { inject, transient, Container } from 'aurelia-dependency-injection';
 import { Config } from 'aurelia-api';
 import { metadata } from 'aurelia-metadata';
-import { Validation, ValidationRule, ValidationGroup } from 'aurelia-validation';
+import { Validator, ValidationRules } from 'aurelia-validation';
 import { getLogger } from 'aurelia-logging';
+import { Config as ViewManagerConfig } from 'aurelia-view-manager';
 
 export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
   constructor(clientConfig) {
@@ -19,7 +20,7 @@ export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
       this.transport = this.clientConfig.getEndpoint(this.getMeta().fetch('endpoint'));
 
       if (!this.transport) {
-        throw new Error(`No transport found for '${ this.getMeta().fetch('endpoint') || 'default' }'.`);
+        throw new Error(`No transport found for '${this.getMeta().fetch('endpoint') || 'default'}'.`);
       }
     }
 
@@ -32,6 +33,16 @@ export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
 
   getMeta() {
     return this.meta;
+  }
+
+  setIdentifier(identifier) {
+    this.identifier = identifier;
+
+    return this;
+  }
+
+  getIdentifier() {
+    return this.identifier;
   }
 
   setResource(resource) {
@@ -48,14 +59,35 @@ export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
     return this.findPath(this.resource, criteria, raw);
   }
 
-  findPath(path, criteria, raw) {
-    let findQuery = this.getTransport().find(path, criteria);
+  findOne(criteria, raw) {
+    return this.findPath(this.resource, criteria, raw, true);
+  }
+
+  findPath(path, criteria, raw, single) {
+    let transport = this.getTransport();
+    let findQuery;
+
+    if (single) {
+      if (typeof criteria === 'object' && criteria !== null) {
+        criteria.limit = 1;
+      }
+
+      findQuery = transport.findOne(path, criteria);
+    } else {
+      findQuery = transport.find(path, criteria);
+    }
 
     if (raw) {
       return findQuery;
     }
 
-    return findQuery.then(x => this.populateEntities(x)).then(populated => {
+    return findQuery.then(response => {
+      return this.populateEntities(response);
+    }).then(populated => {
+      if (!populated) {
+        return null;
+      }
+
       if (!Array.isArray(populated)) {
         return populated.markClean();
       }
@@ -70,25 +102,25 @@ export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
     return this.getTransport().find(this.resource + '/count', criteria);
   }
 
-  populateEntities(data) {
+  populateEntities(data, clean) {
     if (!data) {
       return null;
     }
 
     if (!Array.isArray(data)) {
-      return this.getPopulatedEntity(data);
+      return this.getPopulatedEntity(data, null, clean);
     }
 
     let collection = [];
 
     data.forEach(source => {
-      collection.push(this.getPopulatedEntity(source));
+      collection.push(this.getPopulatedEntity(source, null, clean));
     });
 
     return collection;
   }
 
-  getPopulatedEntity(data, entity) {
+  getPopulatedEntity(data, entity, clean) {
     entity = entity || this.getNewEntity();
     let entityMetadata = entity.getMeta();
     let populatedData = {};
@@ -102,7 +134,13 @@ export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
       let value = data[key];
 
       if (entityMetadata.has('types', key)) {
-        populatedData[key] = typer.cast(value, entityMetadata.fetch('types', key));
+        const dataType = entityMetadata.fetch('types', key);
+
+        if ((dataType === 'date' || dataType === 'datetime') && !value) {
+          continue;
+        }
+
+        populatedData[key] = typer.cast(value, dataType);
 
         continue;
       }
@@ -114,14 +152,15 @@ export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
       }
 
       let repository = this.entityManager.getRepository(entityMetadata.fetch('associations', key).entity);
-      populatedData[key] = repository.populateEntities(value);
+
+      populatedData[key] = repository.populateEntities(value, clean);
     }
 
-    return entity.setData(populatedData);
+    return entity.setData(populatedData, clean);
   }
 
   getNewEntity() {
-    return this.entityManager.getEntity(this.resource);
+    return this.entityManager.getEntity(this.identifier || this.resource);
   }
 
   getNewPopulatedEntity() {
@@ -129,13 +168,15 @@ export let Repository = (_dec = inject(Config), _dec(_class = class Repository {
     let associations = entity.getMeta().fetch('associations');
 
     for (let property in associations) {
-      let assocMeta = associations[property];
+      if (associations.hasOwnProperty(property)) {
+        let assocMeta = associations[property];
 
-      if (assocMeta.type !== 'entity') {
-        continue;
+        if (assocMeta.type !== 'entity') {
+          continue;
+        }
+
+        entity[property] = this.entityManager.getRepository(assocMeta.entity).getNewEntity();
       }
-
-      entity[property] = this.entityManager.getRepository(assocMeta.entity).getNewEntity();
     }
 
     return entity;
@@ -154,6 +195,7 @@ export let Metadata = (_temp = _class4 = class Metadata {
   constructor() {
     this.metadata = {
       repository: DefaultRepository,
+      identifier: null,
       resource: null,
       endpoint: null,
       name: null,
@@ -211,15 +253,9 @@ export let Metadata = (_temp = _class4 = class Metadata {
   }
 }, _class4.key = 'spoonx:orm:metadata', _temp);
 
-export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_class5 = _dec4(_class5 = class Entity {
-  constructor(validator) {
+export let Entity = (_dec3 = transient(), _dec3(_class5 = class Entity {
+  constructor() {
     this.define('__meta', OrmMetadata.forTarget(this.constructor)).define('__cleanValues', {}, true);
-
-    if (!this.hasValidation()) {
-      return this;
-    }
-
-    return this.define('__validator', validator);
   }
 
   getTransport() {
@@ -274,6 +310,7 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
     }
 
     let response;
+
     return this.getTransport().create(this.getResource(), this.asObject(true)).then(created => {
       this.setId(created[this.getIdProperty()]);
       response = created;
@@ -292,9 +329,9 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
     let requestBody = this.asObject(true);
     let response;
 
-    delete requestBody[this.getIdProperty()];
-
-    return this.getTransport().update(this.getResource(), this.getId(), requestBody).then(updated => response = updated).then(() => this.saveCollections()).then(() => this.markClean()).then(() => response);
+    return this.getTransport().update(this.getResource(), this.getId(), requestBody).then(updated => {
+      response = updated;
+    }).then(() => this.saveCollections()).then(() => this.markClean()).then(() => response);
   }
 
   addCollectionAssociation(entity, property) {
@@ -327,16 +364,12 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
 
       entity[associationProperty] = this.getId();
 
-      return entity.save().then(() => {
-        return entity;
-      });
+      return entity.save().then(() => entity);
     }
 
     url.push(entity.getId());
 
-    return this.getTransport().create(url.join('/')).then(() => {
-      return entity;
-    });
+    return this.getTransport().create(url.join('/')).then(() => entity);
   }
 
   removeCollectionAssociation(entity, property) {
@@ -382,6 +415,7 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
 
   markClean() {
     let cleanValues = getFlat(this);
+
     this.__cleanValues = {
       checksum: JSON.stringify(cleanValues),
       data: cleanValues
@@ -399,7 +433,7 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
   }
 
   isNew() {
-    return typeof this.getId() === 'undefined';
+    return !this.getId();
   }
 
   reset(shallow) {
@@ -454,6 +488,26 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
     return this.markClean();
   }
 
+  clear() {
+    if (!this.isNew()) {
+      return this.setData(this.__cleanValues.data.entity);
+    }
+
+    return this;
+  }
+
+  static getIdentifier() {
+    return OrmMetadata.forTarget(this).fetch('identifier');
+  }
+
+  getIdentifier() {
+    return this.__identifier || this.getMeta().fetch('identifier');
+  }
+
+  setIdentifier(identifier) {
+    return this.define('__identifier', identifier);
+  }
+
   static getResource() {
     return OrmMetadata.forTarget(this).fetch('resource');
   }
@@ -504,32 +558,30 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
     return this;
   }
 
-  enableValidation() {
-    if (!this.hasValidation()) {
-      throw new Error('Entity not marked as validated. Did you forget the @validation() decorator?');
-    }
+  setValidator(validator) {
+    this.define('__validator', validator);
 
-    if (this.__validation) {
-      return this;
-    }
-
-    return this.define('__validation', this.__validator.on(this));
+    return this;
   }
 
-  getValidation() {
+  getValidator() {
     if (!this.hasValidation()) {
       return null;
     }
 
-    if (!this.__validation) {
-      this.enableValidation();
-    }
-
-    return this.__validation;
+    return this.__validator;
   }
 
   hasValidation() {
     return !!this.getMeta().fetch('validation');
+  }
+
+  validate(propertyName, rules) {
+    if (!this.hasValidation()) {
+      return Promise.resolve([]);
+    }
+
+    return propertyName ? this.getValidator().validateProperty(this, propertyName, rules) : this.getValidator().validateObject(this, rules);
   }
 
   asObject(shallow) {
@@ -539,7 +591,7 @@ export let Entity = (_dec3 = transient(), _dec4 = inject(Validation), _dec3(_cla
   asJson(shallow) {
     return asJson(this, shallow);
   }
-}) || _class5) || _class5);
+}) || _class5);
 
 function asObject(entity, shallow) {
   let pojo = {};
@@ -603,9 +655,7 @@ function asObject(entity, shallow) {
       }
     });
 
-    if (asObjects.length > 0) {
-      pojo[propertyName] = asObjects;
-    }
+    pojo[propertyName] = asObjects;
   });
 
   return pojo;
@@ -688,24 +738,15 @@ function getPropertyForAssociation(forEntity, entity) {
   })[0];
 }
 
-export function association(associationData) {
-  return function (target, propertyName) {
-    if (!associationData) {
-      associationData = { entity: propertyName };
-    } else if (typeof associationData === 'string') {
-      associationData = { entity: associationData };
-    }
-
-    OrmMetadata.forTarget(target.constructor).put('associations', propertyName, {
-      type: associationData.entity ? 'entity' : 'collection',
-      entity: associationData.entity || associationData.collection
-    });
-  };
-}
-
 export function idProperty(propertyName) {
   return function (target) {
     OrmMetadata.forTarget(target).put('idProperty', propertyName);
+  };
+}
+
+export function identifier(identifierName) {
+  return function (target) {
+    OrmMetadata.forTarget(target).put('identifier', identifierName || target.name.toLowerCase());
   };
 }
 
@@ -727,19 +768,13 @@ export function resource(resourceName) {
   };
 }
 
-export function type(typeValue) {
-  return function (target, propertyName) {
-    OrmMetadata.forTarget(target.constructor).put('types', propertyName, typeValue);
-  };
-}
-
-export function validation() {
+export function validation(ValidatorClass = Validator) {
   return function (target) {
-    OrmMetadata.forTarget(target).put('validation', true);
+    OrmMetadata.forTarget(target).put('validation', ValidatorClass);
   };
 }
 
-export let EntityManager = (_dec5 = inject(Container), _dec5(_class6 = class EntityManager {
+export let EntityManager = (_dec4 = inject(Container), _dec4(_class6 = class EntityManager {
   constructor(container) {
     this.repositories = {};
     this.entities = {};
@@ -747,38 +782,43 @@ export let EntityManager = (_dec5 = inject(Container), _dec5(_class6 = class Ent
     this.container = container;
   }
 
-  registerEntities(entities) {
-    for (let reference in entities) {
-      if (!entities.hasOwnProperty(reference)) {
-        continue;
+  registerEntities(EntityClasses) {
+    for (let property in EntityClasses) {
+      if (EntityClasses.hasOwnProperty(property)) {
+        this.registerEntity(EntityClasses[property]);
       }
-
-      this.registerEntity(entities[reference]);
     }
 
     return this;
   }
 
-  registerEntity(entity) {
-    this.entities[OrmMetadata.forTarget(entity).fetch('resource')] = entity;
+  registerEntity(EntityClass) {
+    let meta = OrmMetadata.forTarget(EntityClass);
+
+    this.entities[meta.fetch('identifier') || meta.fetch('resource')] = EntityClass;
 
     return this;
   }
 
   getRepository(entity) {
     let reference = this.resolveEntityReference(entity);
+    let identifier = entity;
     let resource = entity;
 
     if (typeof reference.getResource === 'function') {
       resource = reference.getResource() || resource;
     }
 
+    if (typeof reference.getIdentifier === 'function') {
+      identifier = reference.getIdentifier() || resource;
+    }
+
     if (typeof resource !== 'string') {
       throw new Error('Unable to find resource for entity.');
     }
 
-    if (this.repositories[resource]) {
-      return this.repositories[resource];
+    if (this.repositories[identifier]) {
+      return this.repositories[identifier];
     }
 
     let metaData = OrmMetadata.forTarget(reference);
@@ -791,10 +831,11 @@ export let EntityManager = (_dec5 = inject(Container), _dec5(_class6 = class Ent
 
     instance.setMeta(metaData);
     instance.resource = resource;
+    instance.identifier = identifier;
     instance.entityManager = this;
 
     if (instance instanceof DefaultRepository) {
-      this.repositories[resource] = instance;
+      this.repositories[identifier] = instance;
     }
 
     return instance;
@@ -818,6 +859,7 @@ export let EntityManager = (_dec5 = inject(Container), _dec5(_class6 = class Ent
     let reference = this.resolveEntityReference(entity);
     let instance = this.container.get(reference);
     let resource = reference.getResource();
+    let identifier = reference.getIdentifier() || resource;
 
     if (!resource) {
       if (typeof entity !== 'string') {
@@ -825,36 +867,39 @@ export let EntityManager = (_dec5 = inject(Container), _dec5(_class6 = class Ent
       }
 
       resource = entity;
+      identifier = entity;
     }
 
-    return instance.setResource(resource).setRepository(this.getRepository(resource));
+    if (instance.hasValidation() && !instance.getValidator()) {
+      let validator = this.container.get(OrmMetadata.forTarget(reference).fetch('validation'));
+
+      instance.setValidator(validator);
+    }
+
+    return instance.setResource(resource).setIdentifier(identifier).setRepository(this.getRepository(identifier));
   }
 }) || _class6);
 
-export let HasAssociationValidationRule = class HasAssociationValidationRule extends ValidationRule {
-  constructor() {
-    super(null, value => !!(value instanceof Entity && typeof value.id === 'number' || typeof value === 'number'), null, 'isRequired');
-  }
-};
-
-export function validatedResource(resourceName) {
+export function validatedResource(resourceName, ValidatorClass) {
   return function (target, propertyName) {
     resource(resourceName)(target);
-    validation()(target, propertyName);
+    validation(ValidatorClass)(target, propertyName);
   };
 }
 
-export function configure(aurelia, configCallback) {
-  let entityManagerInstance = aurelia.container.get(EntityManager);
+export function configure(frameworkConfig, configCallback) {
+  ValidationRules.customRule('hasAssociation', value => value instanceof Entity && typeof value.id === 'number' || typeof value === 'number', `\${$displayName} must be an association.`);
+
+  let entityManagerInstance = frameworkConfig.container.get(EntityManager);
 
   configCallback(entityManagerInstance);
 
-  ValidationGroup.prototype.hasAssociation = function () {
-    return this.isNotEmpty().passesRule(new HasAssociationValidationRule());
-  };
+  frameworkConfig.container.get(ViewManagerConfig).configureNamespace('spoonx/orm', {
+    location: './view/{{framework}}/{{view}}.html'
+  });
 
-  aurelia.globalResources('./component/association-select');
-  aurelia.globalResources('./component/paged');
+  frameworkConfig.globalResources('./component/association-select');
+  frameworkConfig.globalResources('./component/paged');
 }
 
 export const logger = getLogger('aurelia-orm');
@@ -876,5 +921,48 @@ export function endpoint(entityEndpoint) {
     }
 
     OrmMetadata.forTarget(target).put('endpoint', entityEndpoint);
+  };
+}
+
+export function ensurePropertyIsConfigurable(target, propertyName, descriptor) {
+  if (descriptor && descriptor.configurable === false) {
+    descriptor.configurable = true;
+
+    if (!Reflect.defineProperty(target, propertyName, descriptor)) {
+      logger.warn(`Cannot make configurable property '${propertyName}' of object`, target);
+    }
+  }
+}
+
+export function association(associationData) {
+  return function (target, propertyName, descriptor) {
+    ensurePropertyIsConfigurable(target, propertyName, descriptor);
+
+    if (!associationData) {
+      associationData = { entity: propertyName };
+    } else if (typeof associationData === 'string') {
+      associationData = { entity: associationData };
+    }
+
+    OrmMetadata.forTarget(target.constructor).put('associations', propertyName, {
+      type: associationData.entity ? 'entity' : 'collection',
+      entity: associationData.entity || associationData.collection
+    });
+  };
+}
+
+export function enumeration(values) {
+  return function (target, propertyName, descriptor) {
+    ensurePropertyIsConfigurable(target, propertyName, descriptor);
+
+    OrmMetadata.forTarget(target.constructor).put('enumerations', propertyName, values);
+  };
+}
+
+export function type(typeValue) {
+  return function (target, propertyName, descriptor) {
+    ensurePropertyIsConfigurable(target, propertyName, descriptor);
+
+    OrmMetadata.forTarget(target.constructor).put('types', propertyName, typeValue);
   };
 }

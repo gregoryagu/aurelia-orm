@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import {transient} from 'aurelia-dependency-injection';
 import {OrmMetadata} from './orm-metadata';
 
@@ -12,8 +13,6 @@ export class Entity {
    * Construct a new entity.
    *
    * @param {Validator} validator
-   *
-   * @return {Entity}
    */
   constructor() {
     this
@@ -64,8 +63,8 @@ export class Entity {
    */
   define(property, value, writable) {
     Object.defineProperty(this, property, {
-      value: value,
-      writable: !!writable,
+      value     : value,
+      writable  : !!writable,
       enumerable: false
     });
 
@@ -75,7 +74,7 @@ export class Entity {
   /**
    * Get the metadata for this entity.
    *
-   * return {Metadata}
+   * @return {Metadata}
    */
   getMeta() {
     return this.__meta;
@@ -84,17 +83,16 @@ export class Entity {
   /**
    * Get the id property name for this entity.
    *
-   * return {String} The id property name
+   * @return {string}
    */
   getIdProperty() {
     return this.getMeta().fetch('idProperty');
   }
 
-
   /**
    * Get the id property name of the entity (static).
    *
-   * @return {string} The id property name
+   * @return {string}
    */
   static getIdProperty() {
     let idProperty = OrmMetadata.forTarget(this).fetch('idProperty');
@@ -102,10 +100,10 @@ export class Entity {
     return idProperty;
   }
 
-    /**
+  /**
    * Get the Id value for this entity.
    *
-   * return {Number|String} The id
+   * @return {number|string}
    */
   getId() {
     return this[this.getIdProperty()];
@@ -113,6 +111,8 @@ export class Entity {
 
   /**
    * Set the Id value for this entity.
+   *
+   * @param {number|string} id
    *
    * @return {Entity}  this
    * @chainable
@@ -135,9 +135,10 @@ export class Entity {
     }
 
     let response;
+
     return this.getTransport()
       .create(this.getResource(), this.asObject(true))
-      .then((created) => {
+      .then(created => {
         this.setId(created[this.getIdProperty()]);
         response = created;
       })
@@ -171,11 +172,9 @@ export class Entity {
     let requestBody = this.asObject(true);
     let response;
 
-    delete requestBody[this.getIdProperty()];
-
     return this.getTransport()
       .update(this.getResource(), this.getId(), requestBody)
-      .then((updated) => response = updated)
+      .then(updated => { response = updated; })
       .then(() => this.saveCollections())
       .then(() => this.markClean())
       .then(() => response);
@@ -211,29 +210,29 @@ export class Entity {
 
       if (!relation || relation.type !== 'entity') {
         // Many relation, create and then link.
-        return entity.save().then(() => {
-          if (entity.isNew()) {
-            throw new Error('Entity did not return return an id on saving.');
-          }
+        return entity.save()
+          .then(() => {
+            if (entity.isNew()) {
+              throw new Error('Entity did not return return an id on saving.');
+            }
 
-          return this.addCollectionAssociation(entity, property);
-        });
+            return this.addCollectionAssociation(entity, property);
+          });
       }
 
       // toOne relation, pass in ID to prevent extra request. Something something performance.
       entity[associationProperty] = this.getId();
 
-      return entity.save().then(() => {
-        return entity;
-      });
+      return entity.save()
+        .then(() => entity);
     }
 
     // Entity isn't new, just add id to url.
     url.push(entity.getId());
 
-    return this.getTransport().create(url.join('/')).then(() => {
-      return entity;
-    });
+    return this.getTransport()
+      .create(url.join('/'))
+      .then(() => entity);
   }
 
   /**
@@ -262,7 +261,7 @@ export class Entity {
   /**
    * Persist the collections on the entity.
    *
-   * @return {Promise}
+   * @return {Promise} itself
    */
   saveCollections() {
     let tasks              = [];
@@ -295,14 +294,15 @@ export class Entity {
   /**
    * Mark this entity as clean, in its current state.
    *
-   * @return {Entity} this
+   * @return {Entity} itself
    * @chainable
    */
   markClean() {
     let cleanValues    = getFlat(this);
+
     this.__cleanValues = {
       checksum: JSON.stringify(cleanValues),
-      data: cleanValues
+      data    : cleanValues
     };
 
     return this;
@@ -340,7 +340,7 @@ export class Entity {
    *
    * @param {boolean} [shallow]
    *
-   * @return {Entity}
+   * @return {Entity} itself
    */
   reset(shallow) {
     let pojo     = {};
@@ -394,6 +394,49 @@ export class Entity {
 
     return this.markClean();
   }
+  /**
+   * Sets the entity's properties to their clean values
+   *
+   * @return {Entity} itself
+   * @chainable
+   */
+  clear() {
+    if (!this.isNew()) {
+      return this.setData(this.__cleanValues.data.entity);
+    }
+
+    return this;
+  }
+
+  /**
+   * Get the identifier name of this entity's reference (static).
+   *
+   * @return {string|null}
+   */
+  static getIdentifier() {
+    return OrmMetadata.forTarget(this).fetch('identifier');
+  }
+
+  /**
+   * Get the identifier name of this entity instance
+   *
+   * @return {string|null}
+   */
+  getIdentifier() {
+    return this.__identifier || this.getMeta().fetch('identifier');
+  }
+
+  /**
+   * Set this instance's identifier.
+   *
+   * @param {string} identifier
+   *
+   * @return {Entity} itself
+   * @chainable
+   */
+  setIdentifier(identifier) {
+    return this.define('__identifier', identifier);
+  }
 
   /**
    * Get the resource name of this entity's reference (static).
@@ -418,7 +461,7 @@ export class Entity {
    *
    * @param {string} resource
    *
-   * @return {Entity} this
+   * @return {Entity} itself
    * @chainable
    */
   setResource(resource) {
@@ -473,7 +516,7 @@ export class Entity {
    *
    * @param {{}} data
    * @param {boolean} markClean
-   * @return {Entity} this
+   * @return {Entity} itself
    * @chainable
    */
   setData(data, markClean) {
@@ -490,7 +533,7 @@ export class Entity {
    * Set the validator instance.
    *
    * @param {Validator} validator
-   * @return {this}
+   * @return {Entity} itself
    * @chainable
    */
   setValidator(validator) {
@@ -498,7 +541,6 @@ export class Entity {
 
     return this;
   }
-
 
   /**
    * Get the validator instance.
@@ -527,9 +569,9 @@ export class Entity {
    *
    * @param {string|null} propertyName Optional. The name of the property to validate. If unspecified,
    * all properties will be validated.
-   * @param {Rule<any, any>[]|null} rules Optional. If unspecified, the rules will be looked up using
+   * @param {Rule<*, *>[]|null} rules Optional. If unspecified, the rules will be looked up using
    * the metadata for the object created by ValidationRules....on(class/object)
-   * @return {Promise<ValidationError[]>}
+   * @return {Promise<ValidateResult[]>}
    */
   validate(propertyName, rules) {
     // entities without validation are to be considered valid
@@ -639,10 +681,7 @@ function asObject(entity, shallow) {
       }
     });
 
-    // We don't send along empty arrays.
-    if (asObjects.length > 0) {
-      pojo[propertyName] = asObjects;
-    }
+    pojo[propertyName] = asObjects;
   });
 
   return pojo;
@@ -726,11 +765,11 @@ function getCollectionsCompact(forEntity, includeNew) {
  * @param {Entity}  entity
  * @param {boolean} [json]
  *
- * @return {{entity, collections}}
+ * @return {{}} {entity, collections}
  */
 function getFlat(entity, json) {
   let flat = {
-    entity: asObject(entity, true),
+    entity     : asObject(entity, true),
     collections: getCollectionsCompact(entity)
   };
 

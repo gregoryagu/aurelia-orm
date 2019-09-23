@@ -1,18 +1,27 @@
-import {logger} from '../aurelia-orm';
+import {logger, EntityManager} from '../aurelia-orm';
 import {bindingMode} from 'aurelia-binding';
 import {bindable, customElement} from 'aurelia-templating';
+import {inject} from 'aurelia-dependency-injection';
+import {resolvedView} from 'aurelia-view-manager';
 
 @customElement('paged')
+@resolvedView('spoonx/orm', 'paged')
+@inject(EntityManager)
 export class Paged {
 
   // https://github.com/aurelia/templating/issues/73, you still had to set `data` on .two-way when global
-  @bindable({defaultBindingMode: bindingMode.twoWay}) data = [];
-  @bindable({defaultBindingMode: bindingMode.twoWay}) page = 1;
+  @bindable({defaultBindingMode: bindingMode.twoWay}) data    = [];
+  @bindable({defaultBindingMode: bindingMode.twoWay}) loading = false;
+  @bindable({defaultBindingMode: bindingMode.twoWay}) page    = 1;
   @bindable({defaultBindingMode: bindingMode.twoWay}) error;
-  @bindable criteria
-  @bindable repository                                     = null;
-  @bindable resource
-  @bindable limit                                          = 30;
+  @bindable criteria;
+  @bindable repository                                        = null;
+  @bindable resource;
+  @bindable limit                                             = 30;
+
+  constructor(entityManager) {
+    this.entityManager = entityManager;
+  }
 
   /**
    * Attach to view
@@ -37,25 +46,28 @@ export class Paged {
   }
 
   /**
-   * Check if the value is changed
+   * Check if the element property has changed
    *
+   * @param  {string}      property New element property
    * @param  {string|{}}   newVal New value
-   * @param  {[string|{}]} oldVal Old value
-   * @return {Boolean}     Whenever the value is changed
+   * @param  {string|{}}   oldVal Old value
+   *
+   * @return {boolean}
    */
   isChanged(property, newVal, oldVal) {
     return !this[property] || !newVal || (newVal === oldVal);
   }
 
   /**
-   * Change page
+   * Changed page handler
    *
    * @param  {integer} newVal New page value
    * @param  {integer} oldVal Old page value
    */
   pageChanged(newVal, oldVal) {
     if (this.isChanged('resource', newVal, oldVal)
-      || this.isChanged('criteria', newVal, oldVal)) {
+      || this.isChanged('criteria', newVal, oldVal)
+    ) {
       return;
     }
 
@@ -63,7 +75,7 @@ export class Paged {
   }
 
   /**
-   * Change resource
+   * Changed resource handler
    *
    * @param  {{}} newVal New resource value
    * @param  {{}} oldVal Old resource value
@@ -76,9 +88,8 @@ export class Paged {
     this.reloadData();
   }
 
-
   /**
-   * Change criteria
+   * Changed criteria handler
    *
    * @param  {{}} newVal New criteria value
    * @param  {{}} oldVal Old criteria value
@@ -92,8 +103,9 @@ export class Paged {
   }
 
   /**
-   * Change resource
-   * @param  {string resource New resource value
+   * Changed resource handler
+   *
+   * @param  {string} resource New resource value
    */
   resourceChanged(resource) {
     if (!resource) {
@@ -108,12 +120,20 @@ export class Paged {
    */
   getData() {
     let criteria = JSON.parse(JSON.stringify(this.criteria));
-    criteria.skip  = this.page * this.limit - this.limit;
+
+    criteria.skip  = (this.page * this.limit) - this.limit;
     criteria.limit = this.limit;
     this.error     = null;
+    this.loading   = true;
 
-    this.repository.find(criteria, true).then(result => {
-      this.data = result;
-    }).catch(error => this.error = error);
+    this.repository.find(criteria, true)
+      .then(result => {
+        this.data    = result;
+        this.loading = false;
+      })
+      .catch(error => {
+        this.error   = error;
+        this.loading = false;
+      });
   }
 }
